@@ -1,0 +1,33 @@
+#!/bin/bash
+# Grow the TB322FC root to fill its disk on first boot.
+#  - USB drive (non-destructive test): grow the GPT partition, then ext4.
+#  - UFS partition named "rootfs": NEVER repartition the tablet's UFS; only
+#    grow ext4 to the partition (x-systemd.growfs in fstab does the same).
+set -u
+STAMP=/var/lib/steamos-tb322fc/root-grown
+LOG=/var/log/steamos-tb322fc-grow-root.log
+mkdir -p "${STAMP%/*}" /var/log
+exec >>"$LOG" 2>&1
+log() { printf '%s %s\n' "$(date -Iseconds)" "$*"; }
+[[ -f "$STAMP" ]] && exit 0
+src="$(readlink -f "$(findmnt -no SOURCE /)")"
+part="${src##*/}"
+[[ -b "$src" && -f "/sys/class/block/$part/partition" ]] || { log "root $src is not a partition"; exit 0; }
+disk="/dev/$(lsblk -no PKNAME "$src" | head -1)"
+num="$(cat "/sys/class/block/$part/partition")"
+tran="$(lsblk -dno TRAN "$disk" 2>/dev/null | tr -d ' ')"
+log "root=$src disk=$disk part=$num tran=${tran:-?}"
+if [[ "$tran" == usb ]]; then
+  sfdisk --relocate gpt-bak-std "$disk" || log "WARN: GPT relocate failed"
+  echo ", +" | sfdisk --no-reread -N "$num" "$disk" || log "WARN: partition grow failed"
+  partx -u "$disk" 2>/dev/null || true
+  udevadm settle 2>/dev/null || true
+else
+  log "not USB (${tran:-unknown}): partition left untouched"
+fi
+if resize2fs "$src"; then
+  touch "$STAMP"; log "done"
+else
+  log "resize2fs failed, retry next boot"
+fi
+exit 0

@@ -66,7 +66,11 @@ fi
 # Then index.html paints and never pulls libraries.js (no Gamepad window).
 htmlcache="${STEAMROOT}/config/htmlcache"
 is_odin3=0
-if grep -aqE "ayn,odin3|qcom,sm8750" /sys/firmware/devicetree/base/compatible 2>/dev/null; then
+# The Lenovo Legion Tab Y700 Gen 4 (lenovo,elden) is SM8750 but no Odin 3:
+# it must not get the Odin 3 gamepad mapping / scale seeded below.
+if grep -aq "lenovo,elden" /sys/firmware/devicetree/base/compatible 2>/dev/null; then
+  is_odin3=0
+elif grep -aqE "ayn,odin3|qcom,sm8750" /sys/firmware/devicetree/base/compatible 2>/dev/null; then
   is_odin3=1
 fi
 if [[ "$is_odin3" -eq 1 ]]; then

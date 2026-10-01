@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Apply the AYN Odin 3 (SM8750) handheld overlay onto the extracted SteamOS Frame rootfs.
+# Apply the SM8750 overlay onto the extracted SteamOS Frame rootfs.
 # Mesa: ships Freedreno / Turnip Adreno 830 Vulkan driver.
+#
+# SM8750_DEVICE picks the device (default odin3, unchanged behaviour):
+#   odin3    AYN Odin 3: ROCKNIX KERNEL, sm8750-overlay (fan, InputPlumber, rotation)
+#   tb322fc  Lenovo Legion Tab Y700 Gen 4: external-and-mods/kernel-tb322fc
+#            (boot.img + modules + stock firmware), tb322fc-overlay
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,22 +15,45 @@ R="${STEAMOS_ROOTFS:-${WORKDIR}/rootfs}"
 MOD="${ROOT}/external-and-mods"
 OVL="${ROOT}/steamos-overlay"
 SM8750_OVL="${ROOT}/sm8750-overlay"
-KOUT="$(readlink -f "${KERNEL_OUT:-${WORKDIR}/kernel-sm8750-release/7.2.0}")"
-KREL="7.2.0"
+TB322FC_OVL="${ROOT}/tb322fc-overlay"
+SM8750_DEVICE="${SM8750_DEVICE:-odin3}"
 STOCK="${R}/opt/stock-steamos"
 MESA_SO="${SM8750_MESA_SO:-${SM8750_OVL}/usr/lib/libvulkan_freedreno.so}"
-LOG="${WORKDIR}/odin3-apply.log"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "$*" | tee -a "$LOG"; }
 
+case "$SM8750_DEVICE" in
+  odin3)
+    KOUT="$(readlink -f "${KERNEL_OUT:-${WORKDIR}/kernel-sm8750-release/7.2.0}")"
+    KREL="7.2.0"
+    LOG="${WORKDIR}/odin3-apply.log"
+    ;;
+  tb322fc)
+    KOUT="$(readlink -f "${KERNEL_OUT:-${WORKDIR}/kernel-tb322fc}")"
+    [[ -s "$KOUT/kernel.release" ]] || die "missing $KOUT/kernel.release (run external-and-mods/kernel-tb322fc/build.sh)"
+    KREL="$(cat "$KOUT/kernel.release")"
+    LOG="${WORKDIR}/tb322fc-apply.log"
+    ;;
+  *) die "unknown SM8750_DEVICE=$SM8750_DEVICE (odin3|tb322fc)" ;;
+esac
+
 [[ -d "$R/usr/bin" ]] || die "missing rootfs at $R"
-[[ -f "$KOUT/boot/KERNEL" ]] || die "missing kernel at $KOUT/boot/KERNEL"
+if [[ "$SM8750_DEVICE" == odin3 ]]; then
+  [[ -f "$KOUT/boot/KERNEL" ]] || die "missing kernel at $KOUT/boot/KERNEL"
+else
+  [[ -f "$KOUT/boot/boot.img" ]] || die "missing boot image at $KOUT/boot/boot.img"
+  [[ -d "$TB322FC_OVL" ]] || die "missing $TB322FC_OVL"
+fi
 [[ -d "$KOUT/modules/$KREL" ]] || die "missing modules at $KOUT/modules/$KREL"
 [[ -d "$KOUT/firmware" ]] || die "missing firmware at $KOUT/firmware"
 
 : >"$LOG"
-log "== $(date -Iseconds) apply Odin 3 mods into $R"
+if [[ "$SM8750_DEVICE" == odin3 ]]; then
+  log "== $(date -Iseconds) apply Odin 3 mods into $R"
+else
+  log "== $(date -Iseconds) apply TB322FC (Lenovo Legion Tab Y700 Gen 4) mods into $R"
+fi
 
 backup() {
   local src="$1" dest="$2"
@@ -48,6 +76,7 @@ install_file() {
 # ---------------------------------------------------------------------------
 log "== staging kernel ${KREL}"
 mkdir -p "$R/boot" "$R/usr/lib/modules" "$R/usr/lib/firmware" "$R/opt/steamos-sm8750"
+if [[ "$SM8750_DEVICE" == odin3 ]]; then
 if [[ -e "$R/boot/KERNEL" && ! -e "$STOCK/boot/KERNEL" ]]; then
   mkdir -p "$STOCK/boot"
   cp -a "$R/boot/KERNEL" "$STOCK/boot/KERNEL" 2>/dev/null || true
@@ -55,6 +84,15 @@ fi
 cp -a "$KOUT/boot/KERNEL" "$R/boot/KERNEL"
 cp -a "$KOUT/boot/KERNEL.md5" "$R/boot/KERNEL.md5"
 chmod 0644 "$R/boot/KERNEL" "$R/boot/KERNEL.md5"
+else
+  # TB322FC boots boot.img with fastboot from the PC; the rootfs only records
+  # which kernel its modules belong to.
+  mkdir -p "$R/usr/share/steamos-tb322fc"
+  printf '%s\n' "$KREL" >"$R/usr/share/steamos-tb322fc/kernel.release"
+  if [[ -f "$KOUT/SHA256SUMS" ]]; then
+    cp -a "$KOUT/SHA256SUMS" "$R/usr/share/steamos-tb322fc/kernel-SHA256SUMS"
+  fi
+fi
 
 # Clean out old Frame modules and install SM8750 modules
 find "$R/usr/lib/modules" -mindepth 1 -maxdepth 1 ! -name "$KREL" -exec rm -rf {} + 2>/dev/null || true
@@ -93,6 +131,12 @@ for b in gamescope gamescopectl gamescopereaper gamescopestream; do
     install_file "$SM8750_OVL/usr/bin/$b" "$R/usr/local/bin/$b" 0755
   fi
 done
+if [[ "$SM8750_DEVICE" == tb322fc ]]; then
+  # The session passes --use-rotation-shader (unknown to Valve's gamescope)
+  # and the Y700's SPI touchscreen needs GAMESCOPE_SPI_TOUCH_INTERNAL.
+  grep -aq "GAMESCOPE_SPI_TOUCH_INTERNAL" "$R/usr/bin/gamescope" \
+    || die "TB322FC needs our gamescope with the SPI touch fix: set GAMESCOPE_BUILD (scripts/build-gamescope-in-rootfs.sh)"
+fi
 
 if [[ -d "${MOD}/gamescope/scripts" ]]; then
   mkdir -p "$R/usr/share/gamescope" "$R/usr/local/share/gamescope"
@@ -280,6 +324,7 @@ fi
 # ---------------------------------------------------------------------------
 # 5. Odin 3 Overlay (InputPlumber, Display, Audio, Device Manager)
 # ---------------------------------------------------------------------------
+if [[ "$SM8750_DEVICE" == odin3 ]]; then
 log "== SM8750 Odin 3 overlay"
 if [[ -x "${SCRIPT_DIR}/install-inputplumber-sm8550.sh" ]]; then
   "${SCRIPT_DIR}/install-inputplumber-sm8550.sh" "$R"
@@ -288,6 +333,28 @@ if [[ -x "${SCRIPT_DIR}/install-inputplumber-sm8550.sh" ]]; then
 fi
 cp -r --no-preserve=mode,ownership "$SM8750_OVL/." "$R/"
 chmod 0755 "$R/usr/lib/steamos/sm8750-audio-setup" 2>/dev/null || true
+else
+  # TB322FC: none of the Odin 3 hardware files (odin3d fan daemon, rsinput
+  # InputPlumber device, GAMESCOPE_ORIENTATION=right, AYN UCM/audio setup,
+  # Odin SDL mapping). Only the SM8750 pieces that are not board specific:
+  log "== SM8750 TB322FC (Lenovo Legion Tab Y700 Gen 4) overlay"
+  install_file "$SM8750_OVL/usr/lib/modules-load.d/steamos-arm-uhid.conf" \
+    "$R/usr/lib/modules-load.d/steamos-arm-uhid.conf" 0644
+  install_file "$SM8750_OVL/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json" \
+    "$R/usr/share/vulkan/icd.d/freedreno_icd.aarch64.json" 0644
+  cp -r --no-preserve=mode,ownership "$TB322FC_OVL/." "$R/"
+  chmod 0755 "$R/usr/lib/steamos/steamos-tb322fc-grow-root"
+  # One root partition with /home inside (no SD p3 home): the root grows
+  # instead (steamos-tb322fc-grow-root + x-systemd.growfs).
+  rm -f "$R/etc/systemd/system/multi-user.target.wants/steamos-sm8550-expand-home.service"
+  mkdir -p "$R/etc/systemd/system/multi-user.target.wants"
+  ln -sfn /usr/lib/systemd/system/steamos-tb322fc-grow-root.service \
+    "$R/etc/systemd/system/multi-user.target.wants/steamos-tb322fc-grow-root.service"
+  find "$R/usr/share/alsa/ucm2/Qualcomm/sm8750" "$R/usr/share/alsa/ucm2/conf.d/sm8750" \
+    -type d -exec chmod 0755 {} + 2>/dev/null || true
+  find "$R/usr/share/alsa/ucm2/Qualcomm/sm8750" "$R/usr/share/alsa/ucm2/conf.d/sm8750" \
+    -type f -exec chmod 0644 {} + 2>/dev/null || true
+fi
 
 # Our own Mesa (scripts/build-mesa.sh, MESA_STACK=/work/mesa/out): the same
 # 26.2.3 stack as the 8 Gen 2 image, with the Adreno 830 ids added (patches/
@@ -346,6 +413,7 @@ else
   rm -f "$R/usr/lib/environment.d/60-sm8750-zink.conf"
 fi
 
+if [[ "$SM8750_DEVICE" == odin3 ]]; then
 # Boot logs to BOOT/debug-logs when BOOT has an empty "debug" file, same
 # collector as the 8 Gen 2/3 images. /boot is mounted read-only here, so
 # switch it to read-write first.
@@ -357,9 +425,12 @@ ln -sfn ../steamos-arm-bootdebug-file.service \
   "$R/usr/lib/systemd/system/multi-user.target.wants/steamos-arm-bootdebug-file.service"
 printf '[Service]\nExecStartPre=-/bin/mount -o remount,rw /boot\n' \
   >"$R/usr/lib/systemd/system/steamos-arm-bootdebug-file.service.d/10-odin3-boot-rw.conf"
+fi
 
 install_file "$OVL/usr/share/pipewire/pipewire-pulse.conf.d/60-games-keep-device-volume.conf" \
   "$R/usr/share/pipewire/pipewire-pulse.conf.d/60-games-keep-device-volume.conf" 0644
+
+if [[ "$SM8750_DEVICE" == odin3 ]]; then
 
 # Audio setup service
 mkdir -p "$R/etc/systemd/system/multi-user.target.wants"
@@ -391,6 +462,7 @@ find "$R/usr/share/alsa/ucm2/AYN/Odin3" "$R/usr/share/alsa/ucm2/conf.d/sm8750" \
   -type d -exec chmod 0755 {} + 2>/dev/null || true
 find "$R/usr/share/alsa/ucm2/AYN/Odin3" "$R/usr/share/alsa/ucm2/conf.d/sm8750" \
   -type f -exec chmod 0644 {} + 2>/dev/null || true
+fi
 
 # ---------------------------------------------------------------------------
 # 6. User Home / Decky Loader
@@ -431,6 +503,18 @@ touch "$STEAM_HOME/.install-complete"
 
 # Seed Odin 3 default controller mapping and UI scale factor into config.vdf
 mkdir -p "$STEAM_HOME/config"
+if [[ "$SM8750_DEVICE" == tb322fc ]]; then
+# TB322FC: no built-in pad and a 3040x1904 panel; let Steam pick the scale.
+cat <<'VDF' >"$STEAM_HOME/config/config.vdf"
+"InstallConfigStore"
+{
+	"SteamOS"
+	{
+		"WifiForceWPASupplicant"		"1"
+	}
+}
+VDF
+else
 cat <<'VDF' >"$STEAM_HOME/config/config.vdf"
 "InstallConfigStore"
 {
@@ -460,6 +544,7 @@ cat <<'VDF' >"$STEAM_HOME/config/config.vdf"
 	}
 }
 VDF
+fi
 
 install_file "$OVL/usr/share/deckard/RUNSTEAM.sh" "$STEAM_HOME/RUNSTEAM.sh" 0755
 if [[ -d "$STEAM_HOME/linuxarm64" && -d "$STEAM_HOME/steamrtarm64" ]]; then
@@ -499,4 +584,4 @@ bad="$(find "$R/usr/share/gamescope" "$R/etc/gamescope" -xdev -type f ! -perm -o
 find "$R" -xdev -name '._*' -type f -delete 2>/dev/null || true
 [[ -z "$(find "$R" -xdev -name '._*' -type f -print -quit 2>/dev/null)" ]] || die "._ files left in $R"
 
-log "== SM8750 overlays successfully applied"
+log "== SM8750 overlays successfully applied (${SM8750_DEVICE})"

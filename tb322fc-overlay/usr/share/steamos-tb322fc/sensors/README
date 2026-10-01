@@ -1,0 +1,7 @@
+Accelerometer / gyro / ambient light on the Y700 Gen 4 go through the ADSP
+(SSC). They need hexagonrpcd, libssc and the patched iio-sensor-proxy from
+external-and-mods/tb322fc-linux (sources.json + patches/), built natively,
+plus calibration data copied read-only from YOUR OWN Android
+(external-and-mods/tb322fc-linux/docs/rootfs.md, "Sensors: data and services").
+The SteamOS image does not ship those binaries, so these units are only
+staged here and are NOT enabled. Game Mode does not need them.

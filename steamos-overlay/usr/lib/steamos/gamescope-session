@@ -268,8 +268,19 @@ GAMESCOPE_SESSION_TARGET="${GAMESCOPE_SESSION_TARGET:-gamescope-session.target}"
 WATCH_SERVICE=""
 
 IS_ODIN3=0
-if grep -aqE "ayn,odin3|qcom,sm8750" /sys/firmware/devicetree/base/compatible 2>/dev/null; then
+IS_TB322FC=0
+# Lenovo Legion Tab Y700 Gen 4 (TB322FC, "lenovo,elden") is SM8750 too, but
+# not an Odin 3: portrait-native 1904x3040 DSI panel that gamescope's auto
+# orientation turns landscape, SPI touch, no gamepad. Checked first so the
+# SM8750 -> Odin 3 fallback below stays exactly as it was for every other device.
+if grep -aq "lenovo,elden" /sys/firmware/devicetree/base/compatible 2>/dev/null; then
+  IS_TB322FC=1
+elif grep -aqE "ayn,odin3|qcom,sm8750" /sys/firmware/devicetree/base/compatible 2>/dev/null; then
   IS_ODIN3=1
+fi
+if [[ "$IS_TB322FC" == 1 ]]; then
+  # Tie the SPI digitizer to the internal panel (our gamescope, wlserver.cpp).
+  export GAMESCOPE_SPI_TOUCH_INTERNAL="${GAMESCOPE_SPI_TOUCH_INTERNAL:-1}"
 fi
 
 # DRM backend = Wayland compositor + Xwayland. Steam paints on X11 (:0 / xcb).
@@ -330,6 +341,6 @@ fi
 env | grep -E '^(STEAM_DISPLAY_REFRESH_LIMITS|STEAM_USE_MANGOAPP|STEAM_MANGOAPP_[A-Z_]+|STEAM_DISABLE_MANGOAPP_ATOM_WORKAROUND|GAMESCOPE_MANGOAPP_SOCKET_DISABLE|MANGOHUD_CONFIGFILE)=' \
   >"$XDG_RUNTIME_DIR/gamescope-steam.env" 2>/dev/null || true
 
-echo >&2 "gamescope-session: output=$OUTPUT panel=${PANEL_W}x${PANEL_H} nested=${W}x${H}@${REFRESH_HZ} max=${MAX_HZ} mangoapp=${MANGOAPP} kms_rotation=${KMS_ROTATION} ignore_touch=${GAMESCOPE_IGNORE_TOUCH:-} bottom=${GAMESCOPE_LEASE_CONNECTOR:-none} orientation=${PANEL_ORIENT:-auto}"
+echo >&2 "gamescope-session: tb322fc=${IS_TB322FC} odin3=${IS_ODIN3} output=$OUTPUT panel=${PANEL_W}x${PANEL_H} nested=${W}x${H}@${REFRESH_HZ} max=${MAX_HZ} mangoapp=${MANGOAPP} kms_rotation=${KMS_ROTATION} ignore_touch=${GAMESCOPE_IGNORE_TOUCH:-} bottom=${GAMESCOPE_LEASE_CONNECTOR:-none} orientation=${PANEL_ORIENT:-auto}"
 
 exec gamescope "${GAMESCOPE_ARGS[@]}" -- /usr/lib/steamos/gamescope-onready ${WATCH_SERVICE:-}

@@ -1,0 +1,5 @@
+# Lenovo Legion Tab Y700 Gen 4: no built-in gamepad. External USB/Bluetooth
+# controllers go straight to Steam; no InputPlumber composite device.
+KERNEL=="uhid", MODE="0660", GROUP="input", TAG+="uaccess"
+SUBSYSTEM=="hidraw", KERNELS=="000[356]:28DE:*", MODE="0660", GROUP="input", TAG+="uaccess"
+KERNEL=="js[0-9]*", SUBSYSTEM=="input", MODE="0660", GROUP="input", TAG+="uaccess"

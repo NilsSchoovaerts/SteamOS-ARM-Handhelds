@@ -1,6 +1,6 @@
 # SteamOS ARM for handhelds
 
-This is an unofficial port of Valve's SteamOS for ARM, the build they made for the Steam Frame, to Snapdragon handhelds. You get Game Mode and the KDE desktop just like on a Steam Deck. The Frame software is made for a VR headset though, so I've spent a lot of time on the stuff that makes it annoying on a handheld (battery, fan, lag, broken overlay etc.).
+This is Valve's official SteamOS for ARM, the build they made for the Steam Frame, running on Snapdragon handhelds. You get Game Mode and the KDE desktop just like on a Steam Deck. The Frame software is made for a VR headset though, so I've spent a lot of time on the stuff that makes it annoying on a handheld (battery, fan, lag, broken overlay etc.).
 
 ## Supported devices
 
@@ -9,8 +9,8 @@ This is an unofficial port of Valve's SteamOS for ARM, the build they made for t
 | Chip | Devices | Status |
 |---|---|---|
 | Snapdragon 8 Gen 3 (SM8650) | KONKR Pocket FIT, AYANEO Pocket S2 / S2 Pro | stable ([v1.2](https://github.com/hashtagbasit/SteamOS-ARM-Handhelds/releases/tag/v1.2)) |
-| Snapdragon 8 Gen 2 (SM8550) | AYN Odin 2 / Mini / Portal / Thor, AYANEO Pocket ACE / DMG / DS / EVO / S 1K / S 2K, Retroid Pocket 6 / Nova |  beta [(v1.3 beta 9)](https://github.com/hashtagbasit/SteamOS-ARM-Handhelds/releases/tag/v1.3-beta9) |
-| Snapdragon 8 Elite (SM8750) | AYN Odin 3 | beta [(v1.3 beta 1)](https://github.com/hashtagbasit/SteamOS-ARM-Handhelds/releases/tag/v1.3-odin3-beta1)  ([docs/ODIN3-INSTALL.md](docs/ODIN3-INSTALL.md)) |
+| Snapdragon 8 Gen 2 (SM8550) | AYN Odin 2 / Mini / Portal / Thor, AYANEO Pocket ACE / DMG / DS / EVO / S 1K / S 2K, Retroid Pocket 6 / Nova | pre-release beta [v1.3 beta 8](https://github.com/hashtagbasit/SteamOS-ARM-Handhelds/releases/tag/v1.3-beta8) |
+| Snapdragon 8 Elite (SM8750) | AYN Odin 3 | initial support ([docs/ODIN3-INSTALL.md](docs/ODIN3-INSTALL.md)) |
 
 There's one image per chip and you pick your device in the ABL menu, the system figures out the rest. More chips will come later.
 
@@ -18,7 +18,8 @@ There's one image per chip and you pick your device in the ABL menu, the system 
 
 | Chip | Devices | Status |
 |---|---|---|
-| Snapdragon 888 (SM8350) | REDMAGIC 6 (NX669J, North America / global) | works, build it yourself ([docs/redmagic6.md](docs/redmagic6.md)) |
+| Snapdragon 888 (SM8350) | REDMAGIC 6 (NX669J, North America / global) | experimental, build it yourself ([docs/redmagic6.md](docs/redmagic6.md)) |
+| Snapdragon 8 Elite (SM8750) | Lenovo Legion Tab Y700 Gen 4 (TB322FC) | experimental, not boot-tested, build it yourself ([docs/TB322FC.md](docs/TB322FC.md)) |
 
 I only own a Pocket FIT, so if you have one of the others please [let me know how it runs](https://github.com/hashtagbasit/SteamOS-ARM-Handhelds/issues).
 
@@ -47,6 +48,7 @@ I only own a Pocket FIT, so if you have one of the others please [let me know ho
 | Building it yourself | [docs/building.md](docs/building.md) |
 | AYN Odin 3 (SM8750) guide | [docs/ODIN3-INSTALL.md](docs/ODIN3-INSTALL.md) |
 | REDMAGIC 6 (SM8350) guide | [docs/redmagic6.md](docs/redmagic6.md) |
+| Lenovo Legion Tab Y700 Gen 4 (TB322FC) guide | [docs/TB322FC.md](docs/TB322FC.md) |
 
 Found a bug? [Open an issue](https://github.com/hashtagbasit/SteamOS-ARM-Handhelds/issues).
 
@@ -72,7 +74,3 @@ The kernel and all the device support come from [ROCKNIX](https://github.com/ROC
 ## License
 
 My scripts and overlays are GPL-2.0, everything in `external-and-mods/` keeps its own license. See [LICENSE](LICENSE).
-
-## Disclaimer
-
-Not affiliated with or endorsed by Valve. Steam and SteamOS are trademarks of Valve Corporation, used here only to say what this is based on. The kernels and device support are community work, so please don't ask Valve for help with this. It doesn't get updates from Valve either, the OS and the Steam client in it are updated through this project's releases.

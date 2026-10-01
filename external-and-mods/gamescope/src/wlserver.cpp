@@ -446,10 +446,18 @@ static void wlserver_touch_associate_connector(struct wlserver_touch *touch)
 	struct libinput_device *lidev = wlr_libinput_get_device_handle(&touch->wlr->base);
 	struct udev_device *dev = libinput_device_get_udev_device(lidev);
 	auto *parent = dev;
+	// TB322FC (Lenovo Legion Tab Y700 Gen 4): its NT36536 digitizer sits on
+	// SPI, so without this it is never tied to the internal connector and
+	// touch stays 90 degrees off the auto-rotated portrait panel (same fix as
+	// tb322fc-linux packages/gamescope-armada/0023). Opt-in through
+	// GAMESCOPE_SPI_TOUCH_INTERNAL=1 so no other device changes behaviour.
+	const char *pszSpiTouch = getenv( "GAMESCOPE_SPI_TOUCH_INTERNAL" );
+	const bool bSpiTouchInternal = pszSpiTouch && strcmp( pszSpiTouch, "1" ) == 0;
 	while (parent) {
 		const char *subsystem = udev_device_get_subsystem(parent);
 		if (subsystem) {
-			if (strcmp( subsystem, "i2c" ) == 0) {
+			if (strcmp( subsystem, "i2c" ) == 0 ||
+			    ( bSpiTouchInternal && strcmp( subsystem, "spi" ) == 0 )) {
 				connector = GetBackend()->GetConnector(gamescope::GAMESCOPE_SCREEN_TYPE_INTERNAL);
 				break;
 			} else if (strcmp( subsystem, "usb" ) == 0) {

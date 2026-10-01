@@ -1,0 +1,16 @@
+[Unit]
+Description=Grow the TB322FC SteamOS root filesystem to its disk
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=systemd-remount-fs.service
+Before=display-manager.service graphical.target
+ConditionPathExists=!/var/lib/steamos-tb322fc/root-grown
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/steamos/steamos-tb322fc-grow-root
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
